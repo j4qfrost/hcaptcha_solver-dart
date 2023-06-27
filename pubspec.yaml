@@ -1,10 +1,11 @@
 name: hcaptcha_solver
 description: A starting point for Dart libraries or applications.
-version: 1.0.0
-# repository: https://github.com/my_org/my_repo
+version: 0.0.1
+repository: https://github.com/j4qfrost/hcaptcha_solver-dart.git
+homepage: https://j4qfrost.github.io
 
 environment:
-  sdk: ^3.1.0-232.0.dev
+  sdk: ^3.0.5
 
 # Add regular dependencies here.
 dependencies:
