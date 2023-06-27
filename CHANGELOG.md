@@ -1,3 +1,7 @@
+## 0.0.4
+
+- Expose agents.
+
 ## 0.0.3
 
 - Implement Challenge constructor.
