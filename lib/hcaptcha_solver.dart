@@ -3,5 +3,5 @@
 /// More dartdocs go here.
 library;
 
-
-// TODO: Export any libraries intended for clients of this package.
+export 'src/solver.dart';
+export 'src/challenge.dart';
