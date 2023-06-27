@@ -11,17 +11,100 @@ import 'algorithm/algorithm.dart';
 import 'constants.dart';
 import 'event.dart';
 import 'screen/options.dart';
+import 'solver.dart';
+
+const List<String> _widgetCharacters = [
+  'a',
+  'b',
+  'c',
+  'd',
+  'e',
+  'f',
+  'g',
+  'h',
+  'i',
+  'j',
+  'k',
+  'm',
+  'n',
+  'o',
+  'p',
+  'q',
+  'r',
+  's',
+  't',
+  'u',
+  'v',
+  'w',
+  'x',
+  'y',
+  'z',
+  '0',
+  '1',
+  '2',
+  '3',
+  '4',
+  '5',
+  '6',
+  '7',
+  '8',
+  '9'
+];
+
+// WidgetID generates a new random widget ID.
+String _widgetID() {
+  final random = Random();
+  final length = random.nextInt(3) + 10;
+  final buffer = StringBuffer();
+
+  for (int i = 0; i < length; i++) {
+    final charIndex = random.nextInt(_widgetCharacters.length);
+    buffer.write(_widgetCharacters[charIndex]);
+  }
+
+  return buffer.toString();
+}
 
 class Challenge {
-  Challenge(
-    this.host,
-    this.siteKey,
-    this.url,
-    this.widgetID,
-    this.logger,
-    this.agent,
-    this.tasks,
-  );
+  Challenge._({
+    required this.host,
+    required this.siteKey,
+    required this.url,
+    required this.widgetID,
+    required this.logger,
+    required this.agent,
+  });
+
+  static Future<Challenge> init(String url, String siteKey,
+      {ChallengeOptions? opts}) async {
+    opts ??= ChallengeOptions.basicChallengeOptions();
+    // if (opts.proxy.isNotEmpty) {
+    //   final Uri proxyUrl = Uri.parse(opts.proxy);
+    // }
+
+    final String host = url.split('://')[1].split('/')[0];
+    final String widgetID = _widgetID();
+    final Agent agent = await Chrome.init();
+    agent.offsetUnix(-10);
+
+    final Challenge c = Challenge._(
+      host: host,
+      siteKey: siteKey,
+      url: url,
+      widgetID: widgetID,
+      logger: opts.logger,
+      agent: agent,
+    );
+
+    c._setupFrames();
+
+    c.logger.log(Level.debug, 'Verifying site configuration...');
+    c._siteConfig();
+    c.logger.log(Level.info, 'Requesting captcha...');
+    await c._requestCaptcha();
+
+    return c;
+  }
 
   static final Random _rand = Random(DateTime.now().millisecondsSinceEpoch);
 
@@ -29,13 +112,91 @@ class Challenge {
   final String url, widgetID;
   late final String id, token, category, question;
 
-  final List<Task> tasks;
+  final List<Task> _tasks = [];
 
   final Logger logger;
 
   final Agent agent;
   late Proof proof;
   late final EventRecorder top, frame;
+
+  Future solve(Solver solver) async {
+    logger.log(Level.debug, 'Solving challenge with ${solver.runtimeType}...');
+    if (token.isNotEmpty) {
+      return;
+    }
+
+    final split = question.split(' ');
+    final object = split.last
+        .replaceAll('motorbus', 'bus')
+        .replaceAll('airplane', 'aeroplane')
+        .replaceAll('motorcycle', 'motorbike');
+
+    logger.log(Level.debug, 'The type of challenge is "$category"');
+    logger.log(Level.debug, 'The target object is "$object"');
+
+    final answers = solver.solve(category, object, _tasks);
+
+    logger.log(Level.debug,
+        'Decided on ${answers.length}/${_tasks.length} of the tasks given!');
+    logger.log(Level.debug, 'Simulating mouse movements on tiles...');
+
+    _simulateMouseMovements(answers);
+    agent.resetUnix();
+
+    final answersAsMap = <String, Task>{};
+    for (final Task answer in _tasks) {
+      answersAsMap[answer.key] = _answered(answer, answers) as Task;
+    }
+
+    final motionData = <String, dynamic>{};
+    final frameData = frame.data();
+    for (final key in frameData.keys) {
+      final value = frameData[key];
+      motionData[key] = value;
+    }
+    motionData['topLevel'] = top.data();
+    motionData['v'] = 1;
+
+    final encodedMotionData = json.encode(motionData);
+
+    final m = <String, dynamic>{};
+    m['v'] = version;
+    m['job_mode'] = category;
+    m['answers'] = answersAsMap;
+    m['serverdomain'] = host;
+    m['sitekey'] = siteKey;
+    m['motionData'] = encodedMotionData;
+    m['n'] = proof.proof;
+    m['c'] = proof.request;
+
+    final b = utf8.encode(json.encode(m));
+
+    final req = http.Request(
+      'POST',
+      Uri.parse('https://hcaptcha.com/checkcaptcha/$id?s=$siteKey'),
+    );
+    req.headers['Authority'] = 'hcaptcha.com';
+    req.headers['Accept'] = '*/*';
+    req.headers['User-Agent'] = agent.agent;
+    req.headers['Content-Type'] = 'application/json';
+    req.headers['Origin'] = 'https://newassets.hcaptcha.com';
+    req.headers['Sec-Fetch-Site'] = 'same-site';
+    req.headers['Sec-Fetch-Mode'] = 'cors';
+    req.headers['Sec-Fetch-Dest'] = 'empty';
+    req.headers['Accept-Language'] = 'en-US,en;q=0.9';
+    req.bodyBytes = b;
+
+    final response = await http.Response.fromStream(await req.send());
+    final responseBody = jsonDecode(response.body);
+
+    if (!responseBody.get('pass').boolValue) {
+      throw Exception('Incorrect answers');
+    }
+
+    logger.log(Level.info, 'Successfully completed challenge!');
+    token = responseBody.get('generated_pass_UUID').stringValue;
+  }
 
   bool _answered(Task task, List<Task> answers) {
     return answers.where((t) => task.key == t.key).isNotEmpty;
@@ -54,7 +215,7 @@ class Challenge {
     frame.record();
   }
 
-  Future<void> _siteConfig() async {
+  Future _siteConfig() async {
     var url = Uri.parse(
         'https://hcaptcha.com/checksiteconfig?v=$version&host=$host&sitekey=$siteKey&sc=1&swa=1');
     var request = http.Request('GET', url);
@@ -76,7 +237,7 @@ class Challenge {
     proof = await solver.solve(requestJson['req'] as String);
   }
 
-  Future<void> requestCaptcha() async {
+  Future _requestCaptcha() async {
     var prev = {
       'escaped': false,
       'passed': false,
@@ -97,7 +258,7 @@ class Challenge {
 
     var encodedMotionData = jsonEncode(motionData);
 
-    var form = {
+    final Map<String, String> form = {
       'v': version,
       'sitekey': siteKey,
       'host': host,
@@ -107,8 +268,8 @@ class Challenge {
       'c': proof.request,
     };
 
-    var url = Uri.parse('https://hcaptcha.com/getcaptcha?s=$siteKey');
-    var request = http.Request('POST', url);
+    final Uri url = Uri.parse('https://hcaptcha.com/getcaptcha?s=$siteKey');
+    final http.Request request = http.Request('POST', url);
     request.headers['Authority'] = 'hcaptcha.com';
     request.headers['Accept'] = 'application/json';
     request.headers['User-Agent'] = agent.agent;
@@ -138,16 +299,16 @@ class Challenge {
     category = jsonResponse['request_type'];
     question = jsonResponse['requester_question']['en'];
 
-    var tasks = jsonResponse['tasklist'];
+    final List<Map<String, String>> tasks = jsonResponse['tasklist'];
     if (tasks.isEmpty) {
       throw Exception('no tasks in challenge, most likely ratelimited');
     }
 
-    for (var index = 0; index < tasks.length; index++) {
-      var task = tasks[index];
-      tasks.add(Task(
-        task['datapoint_uri'],
-        task['task_key'],
+    for (int index = 0; index < tasks.length; index++) {
+      final Map<String, String> task = tasks[index];
+      _tasks.add(Task(
+        task['datapoint_uri']!,
+        task['task_key']!,
         index,
       ));
     }
@@ -171,7 +332,7 @@ class Challenge {
   }
 
   void _simulateMouseMovements(List<Task> answers) {
-    int totalPages = max(1, (tasks.length / tilesPerPage).floor());
+    int totalPages = max(1, (_tasks.length / tilesPerPage).floor());
     Vector2 cursorPos = Vector2(_rand.nextInt(4) + 1, _rand.nextInt(50) + 300);
 
     int rightBoundary = frameSize.$1;
@@ -181,7 +342,7 @@ class Challenge {
 
     for (int page = 0; page < totalPages; page++) {
       List<Task> pageTiles =
-          tasks.sublist(page * tilesPerPage, (page + 1) * tilesPerPage);
+          _tasks.sublist(page * tilesPerPage, (page + 1) * tilesPerPage);
       for (Task tile in pageTiles) {
         if (!_answered(tile, answers)) {
           continue;
