@@ -5,3 +5,4 @@ library;
 
 export 'src/solver.dart';
 export 'src/challenge.dart';
+export 'src/agents/agent.dart';
