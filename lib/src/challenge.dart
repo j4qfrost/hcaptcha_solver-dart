@@ -23,7 +23,7 @@ class Challenge {
     this.tasks,
   );
 
-  static final Random rand = Random(DateTime.now().millisecondsSinceEpoch);
+  static final Random _rand = Random(DateTime.now().millisecondsSinceEpoch);
 
   final String host, siteKey;
   final String url, widgetID;
@@ -49,7 +49,7 @@ class Challenge {
     top.setData('sc', agent.screenProperties());
     top.setData('nv', agent.navigatorProperties());
     top.setData('exec', false);
-    agent.offsetUnix(rand.nextInt(200) + 200);
+    agent.offsetUnix(_rand.nextInt(200) + 200);
     frame = EventRecorder(agent);
     frame.record();
   }
@@ -71,8 +71,8 @@ class Challenge {
 
     var requestJson = jsonResponse['c'];
 
-    Solver solver =
-        AlgorithmLoader.algorithms()[requestJson['type'] as String]! as Solver;
+    Prover solver =
+        AlgorithmLoader.algorithms()[requestJson['type'] as String]! as Prover;
     proof = await solver.solve(requestJson['req'] as String);
   }
 
@@ -153,8 +153,8 @@ class Challenge {
     }
 
     var requestJson = jsonResponse['c'];
-    Solver solver =
-        AlgorithmLoader.algorithms()[requestJson['type'] as String]! as Solver;
+    Prover solver =
+        AlgorithmLoader.algorithms()[requestJson['type'] as String]! as Prover;
     proof = await solver.solve(requestJson['req']);
   }
 
@@ -164,7 +164,7 @@ class Challenge {
     final List<_Movement> movements = [];
 
     for (Vector2 point in curve.points) {
-      agent.offsetUnix(rand.nextInt(3) + 2);
+      agent.offsetUnix(_rand.nextInt(3) + 2);
       movements.add(_Movement(point, agent.unix()));
     }
     return movements;
@@ -172,7 +172,7 @@ class Challenge {
 
   void _simulateMouseMovements(List<Task> answers) {
     int totalPages = max(1, (tasks.length / tilesPerPage).floor());
-    Vector2 cursorPos = Vector2(rand.nextInt(4) + 1, rand.nextInt(50) + 300);
+    Vector2 cursorPos = Vector2(_rand.nextInt(4) + 1, _rand.nextInt(50) + 300);
 
     int rightBoundary = frameSize.$1;
     int upBoundary = frameSize.$2;
@@ -190,12 +190,12 @@ class Challenge {
         Vector2 tilePos = Vector2(
           ((tileImageSize.$1 * tile.index % tilesPerRow) +
               tileImagePadding.$1 * tile.index % tilesPerRow +
-              rand.nextInt(tileImageSize.$1 - 10) +
+              _rand.nextInt(tileImageSize.$1 - 10) +
               10 +
               tileImageStartPosition.$1) as double,
           ((tileImageSize.$2 * tile.index % tilesPerRow) +
               tileImagePadding.$2 * tile.index % tilesPerRow +
-              rand.nextInt(tileImageSize.$2 - 10) +
+              _rand.nextInt(tileImageSize.$2 - 10) +
               10 +
               tileImageStartPosition.$2) as double,
         );
@@ -215,8 +215,8 @@ class Challenge {
       }
 
       Vector2 buttonPos = Vector2(
-        verifyButtonPosition.$1 + rand.nextInt(45) + 5,
-        verifyButtonPosition.$2 + rand.nextInt(10) + 5,
+        verifyButtonPosition.$1 + _rand.nextInt(45) + 5,
+        verifyButtonPosition.$2 + _rand.nextInt(10) + 5,
       );
 
       List<_Movement> movements =

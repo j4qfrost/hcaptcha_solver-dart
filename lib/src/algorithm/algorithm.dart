@@ -38,7 +38,7 @@ abstract class Algorithm {
   Future<String> prove(String request);
 }
 
-mixin Solver on Algorithm {
+mixin Prover on Algorithm {
   Future<Proof> solve(String request) async {
     try {
       final proof = await prove(request);

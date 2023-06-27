@@ -1,7 +1,7 @@
 import 'package:dart_jsonwebtoken/dart_jsonwebtoken.dart';
 import 'algorithm.dart';
 
-class HSL extends Algorithm with Solver {
+class HSL extends Algorithm with Prover {
   @override
   String get name => 'hsl';
 
