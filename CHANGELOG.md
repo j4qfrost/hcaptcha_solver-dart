@@ -1,3 +1,7 @@
+## 0.0.3
+
+- Implement Challenge constructor.
+
 ## 0.0.2
 
 - Implement Solver.
