@@ -1,3 +1,7 @@
+## 0.0.6
+
+- Await _siteConfig.
+
 ## 0.0.5
 
 - Remove mirrors

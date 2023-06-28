@@ -99,7 +99,7 @@ class Challenge {
     c._setupFrames();
 
     c.logger.log(Level.debug, 'Verifying site configuration...');
-    c._siteConfig();
+    await c._siteConfig();
     c.logger.log(Level.info, 'Requesting captcha...');
     await c._requestCaptcha();
 
