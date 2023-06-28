@@ -1,3 +1,7 @@
+## 0.0.5
+
+- Remove mirrors
+
 ## 0.0.4
 
 - Expose agents.

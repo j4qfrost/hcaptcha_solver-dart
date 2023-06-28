@@ -1,5 +1,5 @@
-import 'dart:mirrors';
-
+import 'package:hcaptcha_solver/src/algorithm/hsl.dart';
+import 'package:hcaptcha_solver/src/algorithm/hsw.dart';
 import 'package:hcaptcha_solver/src/constants.dart';
 import 'package:http/http.dart' as http;
 
@@ -8,20 +8,15 @@ class AlgorithmLoader {
 
   static Map<String, Algorithm> algorithms({bool reload = false}) {
     if (_algorithms == null || reload) {
-      _algorithms = {};
-      MirrorSystem current = currentMirrorSystem();
-      ClassMirror algorithmMirror = reflectClass(Algorithm);
-      for (LibraryMirror library in current.libraries.values) {
-        for (DeclarationMirror declaration in library.declarations.values) {
-          ClassMirror cm = declaration as ClassMirror;
-          if (cm.isSubclassOf(algorithmMirror)) {
-            Algorithm instance = cm.newInstance(Symbol.empty, []).reflectee;
-            _algorithms![instance.name] = instance;
-          }
-        }
-      }
+      add(HSL());
+      add(HSW());
     }
     return _algorithms!;
+  }
+
+  static void add(Algorithm algorithm) {
+    _algorithms ??= {};
+    _algorithms![algorithm.name] = algorithm;
   }
 }
 
