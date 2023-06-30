@@ -1,6 +1,6 @@
 name: hcaptcha_solver
 description: Dart port of [go-captcha](https://github.com/JustTalDevelops/go-hcaptcha).
-version: 0.0.6
+version: 0.0.7
 repository: https://github.com/j4qfrost/hcaptcha_solver-dart.git
 homepage: https://j4qfrost.github.io
 
