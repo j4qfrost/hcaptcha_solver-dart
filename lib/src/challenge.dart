@@ -1,3 +1,4 @@
+import 'dart:collection';
 import 'dart:convert';
 import 'dart:math';
 
@@ -8,7 +9,7 @@ import 'package:vector_math/vector_math.dart';
 
 import 'agents/agent.dart';
 import 'algorithm/algorithm.dart';
-import 'constants.dart';
+import 'utils.dart';
 import 'event.dart';
 import 'screen/options.dart';
 import 'solver.dart';
@@ -54,7 +55,7 @@ const List<String> _widgetCharacters = [
 // WidgetID generates a new random widget ID.
 String _widgetID() {
   final random = Random();
-  final length = random.nextInt(3) + 10;
+  final length = random.nextInt(2) + 10;
   final buffer = StringBuffer();
 
   for (int i = 0; i < length; i++) {
@@ -106,11 +107,10 @@ class Challenge {
     return c;
   }
 
-  static final Random _rand = Random(DateTime.now().millisecondsSinceEpoch);
-
   final String host, siteKey;
   final String url, widgetID;
-  late final String id, token, category, question;
+  late final String id, category, question;
+  String? token;
 
   final List<Task> _tasks = [];
 
@@ -122,20 +122,20 @@ class Challenge {
 
   Future solve(Solver solver) async {
     logger.log(Level.debug, 'Solving challenge with ${solver.runtimeType}...');
-    if (token.isNotEmpty) {
+    if (token != null && token!.isNotEmpty) {
       return;
     }
 
     final split = question.split(' ');
     final object = split.last
-        .replaceAll('motorbus', 'bus')
-        .replaceAll('airplane', 'aeroplane')
-        .replaceAll('motorcycle', 'motorbike');
+        .replaceFirst('motorbus', 'bus')
+        .replaceFirst('airplane', 'aeroplane')
+        .replaceFirst('motorcycle', 'motorbike');
 
     logger.log(Level.debug, 'The type of challenge is "$category"');
     logger.log(Level.debug, 'The target object is "$object"');
 
-    final answers = solver.solve(category, object, _tasks);
+    final List<Task> answers = solver.solve(category, object, _tasks);
 
     logger.log(Level.debug,
         'Decided on ${answers.length}/${_tasks.length} of the tasks given!');
@@ -144,23 +144,21 @@ class Challenge {
     _simulateMouseMovements(answers);
     agent.resetUnix();
 
-    final answersAsMap = <String, Task>{};
-    for (final Task answer in _tasks) {
-      answersAsMap[answer.key] = _answered(answer, answers) as Task;
+    final LinkedHashMap<String, String> answersAsMap =
+        LinkedHashMap<String, String>();
+    for (Task answer in _tasks) {
+      answersAsMap[answer.key] = _answered(answer, answers).toString();
     }
 
-    final motionData = <String, dynamic>{};
-    final frameData = frame.data();
-    for (final key in frameData.keys) {
-      final value = frameData[key];
-      motionData[key] = value;
-    }
+    final LinkedHashMap<String, dynamic> motionData =
+        LinkedHashMap<String, dynamic>();
+    motionData.addAll(frame.data());
     motionData['topLevel'] = top.data();
     motionData['v'] = 1;
 
-    final encodedMotionData = json.encode(motionData);
+    final String encodedMotionData = jsonEncode(motionData);
 
-    final m = <String, dynamic>{};
+    LinkedHashMap<String, dynamic> m = LinkedHashMap<String, dynamic>();
     m['v'] = version;
     m['job_mode'] = category;
     m['answers'] = answersAsMap;
@@ -170,14 +168,12 @@ class Challenge {
     m['n'] = proof.proof;
     m['c'] = proof.request;
 
-    final b = utf8.encode(json.encode(m));
-
     final req = http.Request(
       'POST',
       Uri.parse('https://hcaptcha.com/checkcaptcha/$id?s=$siteKey'),
     );
     req.headers['Authority'] = 'hcaptcha.com';
-    req.headers['Accept'] = '*/*';
+    req.headers['Accept'] = 'application/json';
     req.headers['User-Agent'] = agent.agent;
     req.headers['Content-Type'] = 'application/json';
     req.headers['Origin'] = 'https://newassets.hcaptcha.com';
@@ -185,21 +181,21 @@ class Challenge {
     req.headers['Sec-Fetch-Mode'] = 'cors';
     req.headers['Sec-Fetch-Dest'] = 'empty';
     req.headers['Accept-Language'] = 'en-US,en;q=0.9';
-    req.bodyBytes = b;
+    req.body = jsonEncode(m);
 
     final response = await http.Response.fromStream(await req.send());
     final responseBody = jsonDecode(response.body);
 
-    if (!responseBody.get('pass').boolValue) {
+    if (!responseBody['pass']) {
       throw Exception('Incorrect answers');
     }
 
     logger.log(Level.info, 'Successfully completed challenge!');
-    token = responseBody.get('generated_pass_UUID').stringValue;
+    token = responseBody['generated_pass_UUID'];
   }
 
   bool _answered(Task task, List<Task> answers) {
-    return answers.where((t) => task.key == t.key).isNotEmpty;
+    return answers.any((t) => task.key == t.key);
   }
 
   void _setupFrames() {
@@ -210,27 +206,27 @@ class Challenge {
     top.setData('sc', agent.screenProperties());
     top.setData('nv', agent.navigatorProperties());
     top.setData('exec', false);
-    agent.offsetUnix(_rand.nextInt(200) + 200);
+    agent.offsetUnix(Seed.between(200, 400));
     frame = EventRecorder(agent);
     frame.record();
   }
 
   Future _siteConfig() async {
-    var url = Uri.parse(
+    final Uri url = Uri.parse(
         'https://hcaptcha.com/checksiteconfig?v=$version&host=$host&sitekey=$siteKey&sc=1&swa=1');
-    var request = http.Request('GET', url);
+    final http.Request request = http.Request('GET', url);
     request.headers['Content-Type'] = 'application/json';
     request.headers['User-Agent'] = agent.agent;
 
-    var response = await request.send();
-    var responseBody = await response.stream.bytesToString();
-    var jsonResponse = jsonDecode(responseBody);
+    final http.StreamedResponse response = await request.send();
+    final String responseBody = await response.stream.bytesToString();
+    final jsonResponse = jsonDecode(responseBody);
 
     if (!(jsonResponse['pass'] as bool)) {
       throw Exception('site key is invalid');
     }
 
-    var requestJson = jsonResponse['c'];
+    final requestJson = jsonResponse['c'];
 
     Prover solver =
         AlgorithmLoader.algorithms()[requestJson['type'] as String]! as Prover;
@@ -238,35 +234,38 @@ class Challenge {
   }
 
   Future _requestCaptcha() async {
-    var prev = {
+    final LinkedHashMap<String, bool> prev = LinkedHashMap();
+    prev.addAll({
       'escaped': false,
       'passed': false,
       'expiredChallenge': false,
       'expiredResponse': false,
-    };
+    });
 
-    var motionData = {
+    final LinkedHashMap<String, dynamic> motionData = LinkedHashMap();
+
+    motionData.addAll({
       'v': 1,
-      ...frame.data().map((key, value) => MapEntry(key, value)),
+      ...frame.data(),
       'topLevel': top.data(),
       'session': {},
       'widgetList': [widgetID],
       'widgetId': widgetID,
       'href': this.url,
       'prev': prev,
-    };
+    });
 
-    var encodedMotionData = jsonEncode(motionData);
+    final LinkedHashMap<String, String> form = LinkedHashMap();
 
-    final Map<String, String> form = {
+    form.addAll({
       'v': version,
       'sitekey': siteKey,
       'host': host,
       'hl': 'en',
-      'motionData': encodedMotionData,
+      'motionData': jsonEncode(motionData),
       'n': proof.proof,
       'c': proof.request,
-    };
+    });
 
     final Uri url = Uri.parse('https://hcaptcha.com/getcaptcha?s=$siteKey');
     final http.Request request = http.Request('POST', url);
@@ -281,16 +280,16 @@ class Challenge {
     request.headers['Accept-Language'] = 'en-US,en;q=0.9';
     request.bodyFields = form;
 
-    var response = await request.send();
-    var responseBody = await response.stream.bytesToString();
-    var jsonResponse = jsonDecode(responseBody);
+    final http.StreamedResponse response = await request.send();
+    final String responseBody = await response.stream.bytesToString();
+    final jsonResponse = jsonDecode(responseBody);
 
     if (jsonResponse['pass'] != null) {
       token = jsonResponse['generated_pass_UUID'];
       return;
     }
 
-    var success = jsonResponse['success'];
+    final success = jsonResponse['success'];
     if (success != null && !success) {
       throw Exception('challenge creation request was rejected');
     }
@@ -299,13 +298,13 @@ class Challenge {
     category = jsonResponse['request_type'];
     question = jsonResponse['requester_question']['en'];
 
-    final List<Map<String, String>> tasks = jsonResponse['tasklist'];
+    final List tasks = jsonResponse['tasklist'];
     if (tasks.isEmpty) {
       throw Exception('no tasks in challenge, most likely ratelimited');
     }
 
     for (int index = 0; index < tasks.length; index++) {
-      final Map<String, String> task = tasks[index];
+      final Map<String, dynamic> task = tasks[index];
       _tasks.add(Task(
         task['datapoint_uri']!,
         task['task_key']!,
@@ -313,7 +312,7 @@ class Challenge {
       ));
     }
 
-    var requestJson = jsonResponse['c'];
+    final requestJson = jsonResponse['c'];
     Prover solver =
         AlgorithmLoader.algorithms()[requestJson['type'] as String]! as Prover;
     proof = await solver.solve(requestJson['req']);
@@ -322,10 +321,10 @@ class Challenge {
   List<_Movement> _generateMouseMovements(
       Vector2 fromPoint, Vector2 toPoint, CurveOpts opts) {
     Curve curve = Curve(fromPoint, toPoint, opts);
-    final List<_Movement> movements = [];
+    List<_Movement> movements = [];
 
     for (Vector2 point in curve.points) {
-      agent.offsetUnix(_rand.nextInt(3) + 2);
+      agent.offsetUnix(Seed.between(2, 5));
       movements.add(_Movement(point, agent.unix()));
     }
     return movements;
@@ -333,7 +332,8 @@ class Challenge {
 
   void _simulateMouseMovements(List<Task> answers) {
     int totalPages = max(1, (_tasks.length / tilesPerPage).floor());
-    Vector2 cursorPos = Vector2(_rand.nextInt(4) + 1, _rand.nextInt(50) + 300);
+    Vector2 cursorPos = Vector2(
+        Seed.between(1, 5).toDouble(), Seed.between(300, 350).toDouble());
 
     int rightBoundary = frameSize.$1;
     int upBoundary = frameSize.$2;
@@ -341,8 +341,9 @@ class Challenge {
         CurveOpts(rightBoundary: rightBoundary, upBoundary: upBoundary);
 
     for (int page = 0; page < totalPages; page++) {
-      List<Task> pageTiles =
-          _tasks.sublist(page * tilesPerPage, (page + 1) * tilesPerPage);
+      List<Task> pageTiles = (_tasks.length < tilesPerPage)
+          ? _tasks
+          : _tasks.sublist(page * tilesPerPage, (page + 1) * tilesPerPage);
       for (Task tile in pageTiles) {
         if (!_answered(tile, answers)) {
           continue;
@@ -350,19 +351,20 @@ class Challenge {
 
         Vector2 tilePos = Vector2(
           ((tileImageSize.$1 * tile.index % tilesPerRow) +
-              tileImagePadding.$1 * tile.index % tilesPerRow +
-              _rand.nextInt(tileImageSize.$1 - 10) +
-              10 +
-              tileImageStartPosition.$1) as double,
+                  tileImagePadding.$1 * tile.index % tilesPerRow +
+                  Seed.between(10, tileImageSize.$1) +
+                  tileImageStartPosition.$1)
+              .toDouble(),
           ((tileImageSize.$2 * tile.index % tilesPerRow) +
-              tileImagePadding.$2 * tile.index % tilesPerRow +
-              _rand.nextInt(tileImageSize.$2 - 10) +
-              10 +
-              tileImageStartPosition.$2) as double,
+                  tileImagePadding.$2 * tile.index % tilesPerRow +
+                  Seed.between(10, tileImageSize.$2) +
+                  tileImageStartPosition.$2)
+              .toDouble(),
         );
 
         List<_Movement> movements =
             _generateMouseMovements(cursorPos, tilePos, opts);
+        if (movements.isEmpty) continue;
         _Movement lastMovement = movements.last;
         for (_Movement move in movements) {
           frame.recordEvent(Event(move.point, 'mm', move.timestamp));
@@ -376,12 +378,13 @@ class Challenge {
       }
 
       Vector2 buttonPos = Vector2(
-        verifyButtonPosition.$1 + _rand.nextInt(45) + 5,
-        verifyButtonPosition.$2 + _rand.nextInt(10) + 5,
+        verifyButtonPosition.$1 + Seed.between(5, 50).toDouble(),
+        verifyButtonPosition.$2 + Seed.between(5, 15).toDouble(),
       );
 
       List<_Movement> movements =
           _generateMouseMovements(cursorPos, buttonPos, opts);
+      if (movements.isEmpty) continue;
       _Movement lastMovement = movements.last;
       for (_Movement move in movements) {
         frame.recordEvent(Event(move.point, 'mm', move.timestamp));

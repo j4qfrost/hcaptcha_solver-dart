@@ -87,7 +87,7 @@ class Chrome implements Agent {
     userAgentData['brands'] = [chromium, chrome, notAnyBrand];
     userAgentData['mobile'] = false;
 
-    final m = LinkedHashMap<String, dynamic>();
+    LinkedHashMap<String, dynamic> m = LinkedHashMap<String, dynamic>();
     m['vendorSub'] = '';
     m['productSub'] = '20030107';
     m['vendor'] = 'Google Inc.';
@@ -149,8 +149,9 @@ class Chrome implements Agent {
 
   @override
   int unix() {
-    var now = DateTime.now().millisecondsSinceEpoch;
-    var t = now + unixOffset;
+    DateTime now = DateTime.now();
+    int t = now.microsecondsSinceEpoch ~/ 1000;
+    t += unixOffset;
 
     return t;
   }
@@ -165,6 +166,7 @@ class Chrome implements Agent {
     if (unixOffset > 0) {
       sleep(Duration(milliseconds: unixOffset));
     }
+    unixOffset = 0;
   }
 
   late final (int, int) screenSize;

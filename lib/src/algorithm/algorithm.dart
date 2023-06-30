@@ -1,6 +1,6 @@
 import 'package:hcaptcha_solver/src/algorithm/hsl.dart';
 import 'package:hcaptcha_solver/src/algorithm/hsw.dart';
-import 'package:hcaptcha_solver/src/constants.dart';
+import 'package:hcaptcha_solver/src/utils.dart';
 import 'package:http/http.dart' as http;
 
 class AlgorithmLoader {
@@ -37,14 +37,14 @@ mixin Prover on Algorithm {
   Future<Proof> solve(String request) async {
     try {
       final proof = await prove(request);
-      return Proof(this, request, proof);
+      return Proof(this, '{"type":"$name","req":"$request"}', proof);
     } catch (e) {
-      return Proof(this, request, e.toString());
+      rethrow;
     }
   }
 
   Future<String> source() async {
-    var url =
+    final Uri url =
         Uri.parse('https://newassets.hcaptcha.com/c/$assetVersion/$name.js');
 
     try {

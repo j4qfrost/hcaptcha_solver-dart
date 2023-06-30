@@ -1,3 +1,5 @@
+import 'dart:collection';
+
 import 'package:vector_math/vector_math.dart';
 
 import 'agents/agent.dart';
@@ -15,16 +17,18 @@ class EventRecorder {
 
   bool recording = false;
   final Agent agent;
-  final Map<String, dynamic> _manifest = {};
+  final LinkedHashMap<String, dynamic> _manifest =
+      LinkedHashMap<String, dynamic>();
 
-  final Map<String, EventContainer> timeBuffers = {};
+  final LinkedHashMap<String, EventContainer> timeBuffers =
+      LinkedHashMap<String, EventContainer>();
 
   void record() {
     _manifest['st'] = agent.unix();
     recording = true;
   }
 
-  Map<String, dynamic> data() {
+  LinkedHashMap<String, dynamic> data() {
     timeBuffers.forEach((key, value) {
       _manifest[key] = value.data;
       _manifest['$key-mp'] = value.meanPeriod;
@@ -42,7 +46,7 @@ class EventRecorder {
     }
 
     if (!timeBuffers.containsKey(e.type)) {
-      timeBuffers[e.type] = EventContainer(agent, 16, 15e3 as int);
+      timeBuffers[e.type] = EventContainer(agent, 16, 15000);
     }
     timeBuffers[e.type]!.push(e);
   }
@@ -62,7 +66,7 @@ class EventContainer {
   final List<List<int>> _data = [];
 
   int _previousTimestamp = 0;
-  late final int meanPeriod;
+  int meanPeriod = 0;
   int _meanCounter = 0;
 
   void push(Event event) {
@@ -77,12 +81,12 @@ class EventContainer {
 
     if (event.timestamp - timestamp >= period) {
       _date.add(event.timestamp);
-      _data.add([event.point.x as int, event.point.y as int, event.timestamp]);
+      _data
+          .add([event.point.x.toInt(), event.point.y.toInt(), event.timestamp]);
 
       if (notFirst) {
         int delta = event.timestamp - _previousTimestamp;
-        meanPeriod =
-            ((meanPeriod * _meanCounter + delta) / (_meanCounter + 1)) as int;
+        meanPeriod = (meanPeriod * _meanCounter + delta) ~/ (_meanCounter + 1);
         _meanCounter++;
       }
     }

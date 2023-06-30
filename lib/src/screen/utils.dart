@@ -1,9 +1,8 @@
 import 'package:vector_math/vector_math.dart';
-import 'dart:math';
+
+import '../utils.dart';
 
 class Knot {
-  static final Random _rand = Random(DateTime.now().millisecondsSinceEpoch);
-
   static List<Vector2> merge(List<int> a, List<int> b) {
     if (a.length != b.length) {
       throw Exception("Arguments must be of the same length");
@@ -19,7 +18,7 @@ class Knot {
   static List<int> knots(int firstBoundary, int secondBoundary, int size) {
     List<int> result = [];
     for (int i = 0; i < size; i++) {
-      result.add(_rand.nextInt(secondBoundary - firstBoundary) + firstBoundary);
+      result.add(Seed.between(firstBoundary, secondBoundary));
     }
     return result;
   }

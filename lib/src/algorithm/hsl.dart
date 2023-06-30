@@ -1,4 +1,5 @@
-import 'package:dart_jsonwebtoken/dart_jsonwebtoken.dart';
+import 'dart:convert';
+
 import 'algorithm.dart';
 
 class HSL extends Algorithm with Prover {
@@ -7,23 +8,30 @@ class HSL extends Algorithm with Prover {
 
   @override
   Future<String> prove(String request) async {
-    final jwt = JWT.decode(request);
+    Map<String, dynamic> claims;
 
-    final claims = jwt.payload;
+    var parts = request.split('.');
+    if (parts.length != 3) {
+      throw Exception('Invalid request format');
+    }
 
-    String now = DateTime.now().toUtc().toIso8601String();
-    now = now.substring(0, now.length - 5);
-    now = now.replaceAll('-', '');
-    now = now.replaceAll(':', '');
-    now = now.replaceAll('T', '');
+    var decodedClaims = base64Url.decode(parts[1]);
+    claims = json.decode(utf8.decode(decodedClaims));
+
+    DateTime now = DateTime.now().toUtc();
+    String formattedNow = now.toIso8601String();
+    formattedNow = formattedNow.substring(0, formattedNow.length - 5);
+    formattedNow = formattedNow.replaceAll('-', '');
+    formattedNow = formattedNow.replaceAll(':', '');
+    formattedNow = formattedNow.replaceAll('T', '');
 
     return [
       '1',
-      claims['s'].toInt().toString(),
-      now,
-      claims['d'].toString(),
+      claims['s'].toString(),
+      formattedNow,
+      claims['d'],
       '',
-      '1'
+      '1',
     ].join(':');
   }
 }
