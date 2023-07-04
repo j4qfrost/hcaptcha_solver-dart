@@ -18,8 +18,6 @@ void main() async {
       break;
     } catch (e) {
       print('Error from hCaptcha API: $e');
-      rethrow;
-      // continue;
     }
   }
 }
