@@ -1,3 +1,7 @@
+## 0.0.8
+
+- Add Serialization
+
 ## 0.0.7
 
 - Refactor
