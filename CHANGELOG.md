@@ -1,3 +1,7 @@
+## 0.0.9
+
+- Expose Chrome json
+
 ## 0.0.8
 
 - Add Serialization

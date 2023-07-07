@@ -24,6 +24,10 @@ class Chrome implements Agent {
 
   Chrome(this.screenSize, this.availScreenSize, this.cpuCount, this.memorySize);
 
+  factory Chrome.fromJson(Map<String, dynamic> json) => _$ChromeFromJson(json);
+
+  Map<String, dynamic> toJson() => _$ChromeToJson(this);
+
   Chrome._internal(this._agent) {
     Random rand = Random(DateTime.now().millisecondsSinceEpoch);
     const possibleScreenSizes = [
