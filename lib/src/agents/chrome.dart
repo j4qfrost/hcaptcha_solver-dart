@@ -4,13 +4,26 @@ import 'dart:convert';
 import 'dart:math';
 
 import 'package:http/http.dart' as http;
+import 'package:json_annotation/json_annotation.dart';
 
 import 'dart:collection';
 import 'dart:io';
 
 import 'agent.dart';
 
+part 'chrome.g.dart';
+
+@JsonSerializable()
 class Chrome implements Agent {
+  late final (int, int) screenSize;
+  late final (int, int) availScreenSize;
+
+  late final int cpuCount;
+  late final int memorySize;
+  late final String _agent;
+
+  Chrome(this.screenSize, this.availScreenSize, this.cpuCount, this.memorySize);
+
   Chrome._internal(this._agent) {
     Random rand = Random(DateTime.now().millisecondsSinceEpoch);
     const possibleScreenSizes = [
@@ -168,13 +181,6 @@ class Chrome implements Agent {
     }
     unixOffset = 0;
   }
-
-  late final (int, int) screenSize;
-  late final (int, int) availScreenSize;
-
-  late final int cpuCount;
-  late final int memorySize;
-  final String _agent;
 
   @override
   String get agent => _agent;
