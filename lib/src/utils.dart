@@ -1,5 +1,7 @@
 import 'dart:math';
 
+import 'package:http/http.dart';
+
 const frameSize = (400, 600);
 // TileImageSize is the size of the tile image.
 const tileImageSize = (123, 123);
@@ -43,4 +45,25 @@ class Seed {
         cos(2.0 * pi * u2); // Transform to standard normal distribution
     return z;
   }
+}
+
+String requestToCurl(Request request) {
+  var curl = StringBuffer();
+
+  // Append the cURL command with the request method and URL
+  curl.write("curl -X ${request.method} '${request.url}' \\\n");
+
+  // Append headers to the cURL command
+  for (MapEntry entry in request.headers.entries) {
+    curl.write("  -H '${entry.key}: ${entry.value}' \\\n");
+  }
+
+  // Append the request body to the cURL command
+  final String body = request.body;
+  if (body.isNotEmpty) {
+    curl.write("  --data-raw '$body' \\\n");
+  }
+
+  // Return the generated cURL command
+  return curl.toString();
 }

@@ -1,3 +1,7 @@
+## 0.0.12
+
+- Safe leap
+
 ## 0.0.9
 
 - Expose Chrome json

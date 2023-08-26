@@ -291,7 +291,7 @@ class Challenge {
 
     final success = jsonResponse['success'];
     if (success != null && !success) {
-      throw Exception('challenge creation request was rejected');
+      throw requestToCurl(request);
     }
 
     id = jsonResponse['key'];

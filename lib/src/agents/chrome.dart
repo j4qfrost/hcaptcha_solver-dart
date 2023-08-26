@@ -49,7 +49,7 @@ class Chrome implements Agent {
   }
 
   static Future<Chrome> init() async {
-    var url =
+    Uri url =
         Uri.parse('https://jnrbsn.github.io/user-agents/user-agents.json');
 
     try {
